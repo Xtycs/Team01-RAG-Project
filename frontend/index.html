@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Local RAG Assistant</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <h1>Local Privacy-First RAG Assistant</h1>
+        <p class="subtitle">Guided setup to upload knowledge, ask questions, and view cited answers.</p>
+      </header>
+
+      <nav class="wizard-steps" aria-label="Setup progress">
+        <ol>
+          <li class="step-indicator active" data-step="0">1. Configure</li>
+          <li class="step-indicator" data-step="1">2. Upload</li>
+          <li class="step-indicator" data-step="2">3. Ask</li>
+          <li class="step-indicator" data-step="3">4. Results</li>
+        </ol>
+      </nav>
+
+      <section class="wizard">
+        <article class="wizard-step active" id="step-configure">
+          <h2>Step 1 · Configure the pipeline</h2>
+          <p>Connect to the local API gateway and choose how documents should be processed.</p>
+          <form id="setup-form" novalidate>
+            <div class="field">
+              <label for="api-base">API base URL</label>
+              <input type="url" id="api-base" name="apiBase" value="http://localhost:8000" required />
+              <small>For example: <code>http://localhost:8000</code></small>
+            </div>
+            <div class="grid">
+              <div class="field">
+                <label for="index-type">Index type</label>
+                <select id="index-type" name="index">
+                  <option value="hnsw">HNSW (default)</option>
+                  <option value="ivf">IVF</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="dimension">Embedding dimension</label>
+                <input type="number" id="dimension" name="dimension" value="256" min="64" max="1024" step="32" />
+              </div>
+            </div>
+            <div class="grid">
+              <div class="field">
+                <label for="chunk-size">Chunk size</label>
+                <input type="number" id="chunk-size" name="chunkSize" value="400" min="128" max="2048" />
+              </div>
+              <div class="field">
+                <label for="overlap">Overlap</label>
+                <input type="number" id="overlap" name="overlap" value="40" min="0" max="400" />
+              </div>
+            </div>
+            <div class="field">
+              <label for="max-tokens">Answer token budget (optional)</label>
+              <input type="number" id="max-tokens" name="generatorMaxTokens" min="64" max="1024" step="32" placeholder="512" />
+            </div>
+            <details class="field advanced">
+              <summary>Advanced index parameters</summary>
+              <div class="grid">
+                <div class="field">
+                  <label for="hnsw-ef">HNSW ef</label>
+                  <input type="number" id="hnsw-ef" name="hnswEf" value="32" min="8" max="256" />
+                </div>
+                <div class="field">
+                  <label for="ivf-lists">IVF lists</label>
+                  <input type="number" id="ivf-lists" name="ivfLists" value="4" min="2" max="32" />
+                </div>
+                <div class="field">
+                  <label for="ivf-iterations">IVF iterations</label>
+                  <input type="number" id="ivf-iterations" name="ivfIterations" value="5" min="1" max="50" />
+                </div>
+              </div>
+            </details>
+            <button type="submit" class="primary">Connect &amp; continue</button>
+          </form>
+          <output id="setup-status" class="status" role="status" aria-live="polite"></output>
+        </article>
+
+        <article class="wizard-step" id="step-upload">
+          <h2>Step 2 · Upload knowledge sources</h2>
+          <p>Select documents to ingest or paste text snippets. The gateway will chunk, deduplicate, and index them.</p>
+          <form id="ingest-form" novalidate>
+            <div class="field">
+              <label for="document-files">Upload files</label>
+              <input type="file" id="document-files" name="documents" multiple accept=".txt,.md,.pdf,.docx" />
+              <small>Files are read locally and sent as plain text to the API gateway.</small>
+            </div>
+            <div class="field">
+              <label for="manual-text">Paste text (optional)</label>
+              <textarea id="manual-text" name="manualText" rows="6" placeholder="Paste notes or quick references here..."></textarea>
+            </div>
+            <div class="field">
+              <label for="source-label">Source label</label>
+              <input type="text" id="source-label" name="sourceLabel" placeholder="e.g. Privacy policy notes" />
+            </div>
+            <button type="submit" class="primary">Ingest documents</button>
+          </form>
+          <output id="ingest-status" class="status" role="status" aria-live="polite"></output>
+          <section class="ingest-summary" aria-live="polite">
+            <h3>Ingestion summary</h3>
+            <ul id="ingest-log"></ul>
+          </section>
+          <div class="step-actions">
+            <button type="button" class="secondary" data-nav="back">Back</button>
+            <button type="button" class="primary" data-nav="next">Continue</button>
+          </div>
+        </article>
+
+        <article class="wizard-step" id="step-query">
+          <h2>Step 3 · Ask a question</h2>
+          <p>Send a question to the RAG pipeline and review the cited context.</p>
+          <form id="query-form" novalidate>
+            <div class="field">
+              <label for="question">Question</label>
+              <textarea id="question" name="question" rows="4" required placeholder="What is our privacy policy for offline storage?"></textarea>
+            </div>
+            <div class="field">
+              <label for="top-k">Number of snippets</label>
+              <input type="number" id="top-k" name="topK" value="3" min="1" max="10" />
+            </div>
+            <div class="field">
+              <label for="n-probe">IVF probes (optional)</label>
+              <input type="number" id="n-probe" name="nProbe" min="1" max="16" placeholder="2" />
+              <small>Only used when the IVF index is active.</small>
+            </div>
+            <button type="submit" class="primary">Generate answer</button>
+          </form>
+          <output id="query-status" class="status" role="status" aria-live="polite"></output>
+          <div class="step-actions">
+            <button type="button" class="secondary" data-nav="back">Back</button>
+            <button type="button" class="primary" data-nav="next">View results</button>
+          </div>
+        </article>
+
+        <article class="wizard-step" id="step-results">
+          <h2>Step 4 · Review cited answer</h2>
+          <section id="result-panel" hidden>
+            <h3>Answer</h3>
+            <pre id="answer" class="answer"></pre>
+            <h3>Citations</h3>
+            <ul id="citations"></ul>
+            <h3>Retrieved snippets</h3>
+            <ul id="snippets"></ul>
+          </section>
+          <p id="result-placeholder">Run a query to view the answer and supporting evidence.</p>
+          <div class="step-actions">
+            <button type="button" class="secondary" data-nav="back">Back</button>
+            <button type="button" class="primary" data-nav="restart">Start over</button>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <template id="citation-template">
+      <li>
+        <article>
+          <header>
+            <span class="source"></span>
+            <span class="score"></span>
+          </header>
+          <p class="text"></p>
+        </article>
+      </li>
+    </template>
+
+    <template id="snippet-template">
+      <li>
+        <article>
+          <header>
+            <span class="source"></span>
+            <span class="score"></span>
+          </header>
+          <p class="text"></p>
+        </article>
+      </li>
+    </template>
+
+    <script src="app.js" type="module"></script>
+  </body>
+</html>
